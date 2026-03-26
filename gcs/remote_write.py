@@ -1,3 +1,5 @@
+# All use of this code is permitted to explicit consent from the owner of the repo.
+
 import gcsfs as gcs
 import duckdb as duckdb
 import pandas as pd
@@ -15,6 +17,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def init_duckdb(path=':memory:'):
+    """Initialize a DuckDB connection with GCS (Google Cloud Storage) support.
+
+    Installs the httpfs extension and configures GCS credentials from
+    environment variables GCS_KEY_ID and GCS_SECRET.
+
+    Args:
+        path: Database path. Defaults to ':memory:' for an in-memory database.
+
+    Returns:
+        A configured DuckDB connection, or None if the path is invalid.
+
+    Raises:
+        Exception: If GCS credential environment variables are not set.
+    """
     logger.info(f' initializing the db')
     if not path == ':memory:' and not path.exists():
         logging.info('db path is incorrect, try again later')
@@ -43,7 +59,17 @@ def init_duckdb(path=':memory:'):
         return con
 
 def read_data(path:Path):
-    
+    """Read an Excel file and apply date transformations.
+
+    Parses 'TG5 Actual Date' to datetime, drops rows with missing dates,
+    and adds 'month' and 'year' columns.
+
+    Args:
+        path: Path to the Excel file.
+
+    Returns:
+        A transformed pandas DataFrame, or None if the path is invalid.
+    """
     if not path.exists():
         logger.info(f' the data source in {str(path)} is invalid, try with correct path')
         return None
@@ -59,6 +85,14 @@ def read_data(path:Path):
         return df
 
 def write_parquet(df,bucket_name:str):
+    """Write a DataFrame to partitioned Parquet files on Google Cloud Storage.
+
+    Partitions by year, month, and Product Area.
+
+    Args:
+        df: The pandas DataFrame to write.
+        bucket_name: The GCS bucket name for logging purposes.
+    """
     logging.info(f'preparing to write parquet file')
     pas = pa.Table.from_pandas(df)
     fs = gcs.GCSFileSystem(project=PROJECT_ID)
@@ -66,6 +100,14 @@ def write_parquet(df,bucket_name:str):
     logger.info(f'parquet file written successfully to {bucket_name}')
 
 def query_data(duckdb_connection,bucket_name:str):
+    """Query remote Parquet files on GCS using DuckDB.
+
+    Fetches records for January 2026 (limit 10) and logs each row.
+
+    Args:
+        duckdb_connection: An active DuckDB connection with GCS configured.
+        bucket_name: The GCS bucket name for logging purposes.
+    """
     logging.info(f'querying the remote parquet file using duckdb')
     res = duckdb_connection.execute("SELECT * FROM 'gs://smj_adk_data/parquet/*/*/*/*.parquet' WHERE year = 2026  and month = 1 limit 10").fetchdf()
     logger.info(f'query executed successfully')
@@ -86,9 +128,3 @@ if __name__ == '__main__':
         raise Exception('could not read data')
     write_parquet(df, 'smj_adk_data')
     query_data(con, 'smj_adk_data')
-
-
-    
-
-    
-
