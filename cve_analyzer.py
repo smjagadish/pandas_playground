@@ -1,3 +1,5 @@
+# All use of this code is permitted to explicit consent from the owner of the repo.
+
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -10,12 +12,28 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def init_duckdb(path=':memory:'):
+    """Initialize and return a DuckDB connection.
+
+    Args:
+        path: Database path. Defaults to ':memory:' for an in-memory database.
+
+    Returns:
+        A DuckDB connection object.
+    """
     con = duckdb.connect(path)
     return con
 
 def readData(path:Path):
+    """Read a CSV file and drop unnecessary columns.
+
+    Args:
+        path: Path to the CSV file.
+
+    Returns:
+        A pandas DataFrame with selected columns removed.
+    """
     if not path.exists():
-        logger.info('file does not exist , retry later')
+        logger.info('file does not exist , retry at a later time')
     else:
         df = pd.read_csv(path)
         df = df.drop(columns=['CVSS Base Score', 'CVSS Vector','Ericsson Contextualized CVSS Base Score',
@@ -25,6 +43,11 @@ def readData(path:Path):
     return df
 
 def write_parquet(df):
+    """Write a DataFrame to partitioned Parquet files.
+
+    Args:
+        df: The pandas DataFrame to write.
+    """
     tables = pa.Table.from_pandas(df)
     pq.write_to_dataset(
         tables,
@@ -34,6 +57,11 @@ def write_parquet(df):
     logger.info('parquet files written)')
 
 def queryDB(con):
+    """Query the DuckDB database for vulnerabilities with medium severity.
+
+    Args:
+        con: An active DuckDB connection.
+    """
     logger.info('querying the db for all vulns with medium severity')
     res = con.execute("SELECT * from read_parquet('./data/*/*/*.parquet') where Severity = 'medium'").df()
     if res.empty:
